@@ -1,0 +1,35 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: dbk-psa-{{ .Values.name }}-ingress # for qal1 and qal2 name should contain
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+    nginx.ingress.kubernetes.io/ssl-redirect: {{ not .Values.ingress.internal | quote }}
+spec:
+  {{- if not .Values.ingress.internal }}
+  tls:
+  - hosts:
+      - {{ template "ingress.host" . }}
+    secretName: {{ .Values.name }}-{{ .Values.ingress.tlsSecretSuffix }}
+  {{- end }}
+  rules:
+  - host: {{ template "ingress.host" . }}
+    http:
+      paths:
+      - backend:
+          serviceName: dbk-psa-{{ .Values.name }}-svc # This needs to be the name of the service you wish to route to
+          servicePort: {{ .Values.service.port }}
+        path: /{{ .Values.contextName }}/
+  {{- end }}
+  {{- if hasKey .Values "pte"}}
+  - host: jolokia.{{ template "ingress.host" . }}
+    http:
+      paths:
+      - backend:
+          serviceName: {{ .Values.name }}
+          servicePort: {{ .Values.pte.jolokiaPort }}
+        path: /
+  {{- end }}

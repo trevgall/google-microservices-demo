@@ -1,0 +1,8 @@
+{{- if .Values.envConfig.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: dbk-psa-{{ .Values.name }}-env
+data:
+{{ toYaml .Values.envConfig.data | indent 2 }}
+{{- end}}

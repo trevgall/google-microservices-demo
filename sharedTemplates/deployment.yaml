@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dbk-psa-application-{{ .Values.name }}-{{ .Values.ingress.env }}{{ .Values.ingress.subenv }}
+  labels:
+    app: dbk-psa-application-{{ .Values.name }}
+    environment: {{ .Values.ingress.env }}{{ .Values.ingress.subenv }}
+    # run 3
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.deployment.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+  template:
+    metadata:
+      annotations:
+        configHash: {{ quote .Values.configFiles | sha256sum }}
+        # The configuration for app-only injection should be set here.
+        {{- if hasKey .Values "dynatrace" }}
+        {{- if .Values.dynatrace.enabled }}
+        oneagent.dynatrace.com/inject: "true"
+        oneagent.dynatrace.com/flavor: "default"
+        {{- end }}
+        {{- end }}
+      labels:
+        app: {{ .Values.name }}
+    spec:
+      {{- if hasKey .Values "serviceAccount" }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- end }}
+      volumes:
+      - name: config-files-volume
+        configMap:
+          name: dbk-psa-{{ .Values.name }}-files
+          optional: false
+      - name: application-secrets
+        secret:
+          secretName: dbk-{{ .Values.secrets.name }}
+      initContainers:
+      
+      containers:
+        - name: dbk-psa-application-{{ .Values.name }}-{{ .Values.ingress.env }}{{ .Values.ingress.subenv }}
+          image: "{{ .Values.deployment.image.repository }}:{{ .Values.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.deployment.image.pullPolicy }}
+          env:
+            - name: APP_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: APP_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+          volumeMounts:
+          - name: config-files-volume
+            mountPath: {{ .Values.configFiles.path }}
+            subPath: configs
+            readOnly: true
+          - name: application-secrets
+            mountPath: /usr/local/secrets
+            readOnly: true
+          ports:
+            - name: http
+              containerPort: {{ .Values.deployment.containerPort }}
+              protocol: TCP
+          {{- if .Values.deployment.probes.liveness.enabled }}
+          livenessProbe:
+            failureThreshold: {{ .Values.deployment.probes.liveness.threshold }}
+            periodSeconds: {{ .Values.deployment.probes.liveness.preiodSeconds }}
+            httpGet:
+              path: {{ .Values.deployment.probes.liveness.path }}
+              port: http
+          {{- if .Values.deployment.probes.startup.enabled }}
+          startupProbe:
+            failureThreshold: {{ .Values.deployment.probes.startup.threshold }}
+            periodSeconds: {{ .Values.deployment.probes.startup.periodSeconds }}
+            httpGet:
+              path: {{ .Values.deployment.probes.liveness.path }}
+              port: http
+          {{- end }}
+          {{- end }}
+          {{- if .Values.deployment.probes.readiness.enabled }}
+          readinessProbe:
+            failureThreshold: {{ .Values.deployment.probes.readiness.failureThreshold }}
+            successThreshold: {{ .Values.deployment.probes.readiness.successThreshold }}
+            periodSeconds: {{ .Values.deployment.probes.readiness.periodSeconds }}
+            httpGet:
+              path: {{ .Values.deployment.probes.readiness.path }}
+              port: http
+          {{- end }}
+          {{- if .Values.autoscaling.enabled }}
+          resources:
+            limits:
+              cpu: {{ .Values.deployment.limits.cpu }}
+              memory: {{ .Values.deployment.limits.memory }}
+            requests:
+              cpu: {{ .Values.deployment.requests.cpu }}
+              memory: {{ .Values.deployment.requests.memory }}
+          {{- end }}
+          {{- if .Values.envConfig.enabled }}
+          envFrom: 
+          - configMapRef: 
+              name: dbk-psa-{{ .Values.name }}-env
+          {{- end }}

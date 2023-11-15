@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "resiproxy.fullname" . }}
+  labels:
+    app: {{ template "resiproxy.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "resiproxy.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "resiproxy.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      serviceAccountName: resiproxy
+      containers:
+        - name: toxiproxy
+          image: "{{ .Values.image.toxiproxy.repository }}:{{ .Values.image.toxiproxy.tag }}"
+          imagePullPolicy: {{ .Values.image.toxiproxy.pullPolicy }}
+          ports:
+            - name: http-{{ .Values.service.toxiproxy.name }}
+              protocol: TCP
+              containerPort: {{ .Values.service.toxiproxy.internalPort }}
+          readinessProbe:
+            httpGet:
+              path: /version
+              port: {{ .Values.service.toxiproxy.internalPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+        - name: {{ .Chart.Name }}
+          envFrom:
+            - configMapRef:
+                name: configmap-{{ .Values.service.resiproxy.name }}
+          image: "{{ .Values.image.resiproxy.repository }}:{{ .Values.image.resiproxy.tag }}"
+          imagePullPolicy: {{ .Values.image.resiproxy.pullPolicy }}
+          ports:
+            - name: http-{{ .Values.service.resiproxy.name }}
+              protocol: TCP
+              containerPort: {{ .Values.service.resiproxy.internalPort }}
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: {{ .Values.service.resiproxy.internalPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+    {{- end }}

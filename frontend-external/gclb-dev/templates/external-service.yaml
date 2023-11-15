@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: internal-app-frontend-external
+spec:
+  externalName: frontend.sre-demo-microservices.dev.int.dbk.ncr.com
+  type: ExternalName

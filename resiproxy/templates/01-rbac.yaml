@@ -1,0 +1,31 @@
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: resiproxy
+  namespace: {{ .Release.Namespace | default "default"}}
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: resiproxy-read
+rules:
+- apiGroups: [""]
+  resources:
+  - services
+  - pods
+  verbs: ["get", "list", "watch", "update"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: resiproxy-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: resiproxy-read
+subjects:
+- kind: ServiceAccount
+  name: resiproxy
+  namespace: {{ .Release.Namespace | default "default"}}
+---

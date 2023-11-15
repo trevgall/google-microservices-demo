@@ -1,0 +1,8 @@
+{{- if .Values.configFiles.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+    name: dbk-psa-{{ .Values.name }}-files
+data:
+{{ toYaml .Values.configFiles.data | indent 2 }}
+{{- end }}
