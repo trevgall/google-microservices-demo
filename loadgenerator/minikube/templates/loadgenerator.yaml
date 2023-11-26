@@ -40,7 +40,7 @@ spec:
         - name: FRONTEND_ADDR
           value: "trg.shop.demo/shop"
         - name: USERS
-          value: "1"
+          value: "10"
         resources:
           requests:
             cpu: 300m
